@@ -8,9 +8,13 @@ import uuid
 import os
 from fastapi.responses import FileResponse
 import tempfile
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["media"])
+
+class MediaUpdate(BaseModel):
+    label: str | None = None
 
 @router.get("/story/{story_id}")
 async def get_story_media(
@@ -41,6 +45,7 @@ async def upload_media(
     file: UploadFile = File(...),
     story_id: int = Form(None),
     media_type: str = Form(...),
+    label: str | None = Form(None),
     current_user: dict = Depends(get_current_user)
 ):
     try:
@@ -75,7 +80,8 @@ async def upload_media(
             story_id=story_id,
             file_path=file_path,
             media_type=media_type,
-            user_id=current_user["id"]  # Add user_id to satisfy RLS policy
+            user_id=current_user["id"],  # Add user_id to satisfy RLS policy
+            label=label
         )
         
         # Insert into media_attachments table
@@ -189,4 +195,45 @@ async def get_media(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error serving media: {str(e)}"
-        ) 
+        )
+
+@router.patch("/{media_id}")
+async def update_media(
+    media_id: int,
+    update: MediaUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a media item's label."""
+    try:
+        logger.info(f"Updating media {media_id} with label: {update.label}")
+        
+        # Get authenticated Supabase client
+        supabase = get_authenticated_client(current_user["token"])
+        
+        # First check if the media exists and belongs to the user
+        check_response = supabase.table("media_attachments") \
+            .select("id") \
+            .eq("id", media_id) \
+            .eq("user_id", current_user["id"]) \
+            .single() \
+            .execute()
+            
+        if not check_response.data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Media not found or access denied"
+            )
+        
+        # Update the media record
+        response = supabase.table("media_attachments") \
+            .update({"label": update.label}) \
+            .eq("id", media_id) \
+            .eq("user_id", current_user["id"]) \
+            .execute()
+            
+        logger.info(f"Media update response: {response.data}")
+        return response.data[0] if response.data else None
+        
+    except Exception as e:
+        logger.error(f"Error updating media: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e)) 

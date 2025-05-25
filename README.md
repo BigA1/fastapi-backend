@@ -21,12 +21,17 @@ The backend service for MyStoree, built with FastAPI, providing speech-to-text t
 - Passlib (Password Hashing)
 - Python-multipart (File Uploads)
 - Uvicorn (ASGI Server)
+- FFmpeg (Audio Processing)
 
 ## Prerequisites
 
 - Python 3.8+
 - Supabase account and project
 - OpenAI API key
+- FFmpeg (for audio processing)
+  - Windows: Download from https://ffmpeg.org/download.html and add to PATH
+  - macOS: `brew install ffmpeg`
+  - Linux: `sudo apt-get install ffmpeg`
 
 ## Setup
 

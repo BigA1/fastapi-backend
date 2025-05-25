@@ -17,6 +17,10 @@ class Story(StoryBase):
     id: int
     created_at: datetime
     user_id: str
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
 
 # Media attachment model
 class MediaAttachment(BaseModel):
@@ -26,6 +30,7 @@ class MediaAttachment(BaseModel):
     media_type: str  # 'image' or 'audio'
     created_at: datetime
     user_id: str
+    label: str | None = None  # Optional label for the media
 
 # Used when creating a media attachment
 class MediaAttachmentCreate(BaseModel):
@@ -33,3 +38,10 @@ class MediaAttachmentCreate(BaseModel):
     file_path: str
     media_type: str
     user_id: str
+    label: str | None = None  # Optional label for the media
+
+# Used when updating a story
+class StoryUpdate(StoryBase):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    date: Optional[str] = None
