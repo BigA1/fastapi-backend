@@ -1,8 +1,8 @@
 from fastapi import Request, HTTPException
-from jose import jwt
-import os
+import logging
+from app.supabase.client import supabase
 
-SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")  # or hardcode during testing
+logger = logging.getLogger(__name__)
 
 def verify_token(request: Request):
     auth_header = request.headers.get("Authorization")
@@ -12,7 +12,18 @@ def verify_token(request: Request):
     token = auth_header.split(" ")[1]
 
     try:
-        payload = jwt.decode(token, SUPABASE_JWT_SECRET, algorithms=["HS256"])
-        return payload  # has "sub" = user_id
-    except Exception:
+        # Use Supabase client to verify the token
+        user = supabase.auth.get_user(token)
+        
+        # Log the user info for debugging
+        logger.info(f"Verified user: {user}")
+        
+        # Return the user data
+        return {
+            "sub": user.user.id,
+            "email": user.user.email,
+            "role": user.user.role
+        }
+    except Exception as e:
+        logger.error(f"Token verification failed: {str(e)}")
         raise HTTPException(status_code=401, detail="Token verification failed")

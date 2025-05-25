@@ -1,35 +1,95 @@
-from fastapi import APIRouter, HTTPException, Depends
-from app.models.story import Story, StoryCreate
-from app.services import story_service
-from app.auth.dependencies import verify_token
+from fastapi import APIRouter, Depends, HTTPException, status
+from app.models.story import StoryCreate
+from app.services.story_service import get_all_stories, get_story_by_id, create_story, update_story, delete_story
+from app.core.auth import get_current_user
+from typing import List, Dict, Any, Optional
+import logging
+from app.supabase.client import get_authenticated_client
 
-router = APIRouter(prefix="/stories", tags=["stories"])
+logger = logging.getLogger(__name__)
 
-@router.get("/", response_model=list[Story])
-def list_stories(user=Depends(verify_token)):
-    return story_service.get_all_stories(user_id=user["sub"])
+router = APIRouter()
 
-@router.get("/{story_id}", response_model=Story)
-def get_story(story_id: int, user=Depends(verify_token)):
-    story = story_service.get_story_by_id(story_id)
-    if not story or story["user_id"] != user["sub"]:
-        raise HTTPException(status_code=404, detail="Story not found")
-    return story
+@router.get("/", response_model=List[Dict[str, Any]])
+async def list_stories(current_user: Dict[str, Any] = Depends(get_current_user)):
+    try:
+        logger.info(f"Fetching stories for user {current_user.get('id')}")
+        logger.debug(f"User data: {current_user}")
+        
+        if not current_user.get("token"):
+            logger.error("No token found in current_user")
+            raise HTTPException(status_code=401, detail="No authentication token found")
+            
+        stories = get_all_stories(current_user["id"], current_user["token"])
+        logger.info(f"Successfully fetched {len(stories)} stories")
+        return stories
+    except Exception as e:
+        logger.error(f"Error in list_stories: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.post("/", status_code=201, response_model=Story)
-def create(story: StoryCreate, user=Depends(verify_token)):
-    return story_service.create_story(story, user_id=user["sub"])[0]
+@router.get("/{story_id}", response_model=Dict[str, Any])
+async def get_story(story_id: int, current_user: Dict[str, Any] = Depends(get_current_user)):
+    try:
+        logger.info(f"Fetching story {story_id} for user {current_user.get('id')}")
+        story = get_story_by_id(story_id, current_user["token"])
+        if not story:
+            raise HTTPException(status_code=404, detail="Story not found")
+        return story
+    except Exception as e:
+        logger.error(f"Error in get_story: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.put("/{story_id}", response_model=Story)
-def update(story_id: int, story: StoryCreate, user=Depends(verify_token)):
-    existing = story_service.get_story_by_id(story_id)
-    if not existing or existing["user_id"] != user["sub"]:
-        raise HTTPException(status_code=404, detail="Story not found")
-    return story_service.update_story(story_id, story)[0]
+@router.post("/", response_model=Dict[str, Any])
+async def create_new_story(story: StoryCreate, current_user: Dict[str, Any] = Depends(get_current_user)):
+    try:
+        logger.info(f"Creating story for user {current_user.get('id')}")
+        return create_story(story, current_user["id"], current_user["token"])
+    except Exception as e:
+        logger.error(f"Error in create_new_story: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.delete("/{story_id}", status_code=204)
-def delete(story_id: int, user=Depends(verify_token)):
-    existing = story_service.get_story_by_id(story_id)
-    if not existing or existing["user_id"] != user["sub"]:
-        raise HTTPException(status_code=404, detail="Story not found")
-    story_service.delete_story(story_id)
+@router.put("/{story_id}", response_model=Dict[str, Any])
+async def update_existing_story(story_id: int, story: StoryCreate, current_user: Dict[str, Any] = Depends(get_current_user)):
+    try:
+        logger.info(f"Updating story {story_id} for user {current_user.get('id')}")
+        return update_story(story_id, story, current_user["id"], current_user["token"])
+    except Exception as e:
+        logger.error(f"Error in update_existing_story: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{story_id}")
+async def delete_existing_story(story_id: int, current_user: Dict[str, Any] = Depends(get_current_user)):
+    try:
+        logger.info(f"Deleting story {story_id} for user {current_user.get('id')}")
+        return delete_story(story_id, current_user["id"], current_user["token"])
+    except Exception as e:
+        logger.error(f"Error in delete_existing_story: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{story_id}/media")
+async def get_story_media(
+    story_id: int,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get media for a specific story."""
+    try:
+        logger.info(f"Fetching media for story {story_id}")
+        
+        # Get authenticated Supabase client
+        supabase = get_authenticated_client(current_user["token"])
+        
+        # Query the media_attachments table for this story
+        response = supabase.table("media_attachments") \
+            .select("*") \
+            .eq("story_id", story_id) \
+            .execute()
+            
+        logger.info(f"Media response data: {response.data}")
+        return response.data
+        
+    except Exception as e:
+        logger.error(f"Error in get_story_media: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching media: {str(e)}"
+        )
