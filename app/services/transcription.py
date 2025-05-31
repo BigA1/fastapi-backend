@@ -3,10 +3,11 @@ from fastapi import UploadFile
 import openai
 from typing import Optional
 import tempfile
+from app.core.config import settings
 
 class TranscriptionService:
     def __init__(self):
-        self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
 
     async def transcribe_audio(self, audio_file: UploadFile) -> Optional[str]:
         try:

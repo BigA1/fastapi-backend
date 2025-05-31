@@ -1,5 +1,5 @@
-from supabase import create_client
-from app.core.config import SUPABASE_URL, SUPABASE_KEY
+from supabase import create_client, Client
+from app.core.config import settings
 import logging
 import json
 from jose import jwt
@@ -7,32 +7,32 @@ from jose import jwt
 logger = logging.getLogger(__name__)
 
 # Use anon key for backend operations
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
-def get_authenticated_client(token: str):
-    """Get a Supabase client with the user's JWT token."""
+def get_authenticated_client(token: str) -> Client:
+    """
+    Create an authenticated Supabase client with the provided token.
+    """
     try:
-        logger.info("Creating authenticated Supabase client")
-        client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        logger.info("Creating Supabase client...")
+        logger.info(f"Supabase URL: {settings.SUPABASE_URL}")
+        logger.info(f"Supabase Key: {settings.SUPABASE_KEY[:10]}...")
+        logger.info(f"Token (first 20 chars): {token[:20]}...")
         
-        # Decode the token to get the refresh token
-        try:
-            # First try to decode without verification to get the refresh token
-            unverified = jwt.get_unverified_claims(token)
-            logger.debug(f"Unverified token payload: {unverified}")
+        # Create the client with the API key
+        client = create_client(
+            settings.SUPABASE_URL,
+            settings.SUPABASE_KEY
+        )
+        
+        # Verify the token
+        user = client.auth.get_user(token)
+        if not user:
+            raise Exception("Invalid token")
             
-            # Get the refresh token from the payload
-            refresh_token = unverified.get("refresh_token", "")
-            
-            # Set the session with both tokens
-            logger.debug("Setting session with tokens")
-            client.auth.set_session(token, refresh_token)
-            logger.info("Successfully created authenticated client")
-            return client
-        except Exception as e:
-            logger.error(f"Error decoding token: {str(e)}")
-            raise
-            
+        logger.info("Supabase client created successfully")
+        return client
+        
     except Exception as e:
-        logger.error(f"Error creating authenticated client: {str(e)}", exc_info=True)
+        logger.error(f"Error creating Supabase client: {str(e)}", exc_info=True)
         raise
