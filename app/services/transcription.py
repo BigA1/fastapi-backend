@@ -19,6 +19,12 @@ class TranscriptionService:
                     content = await audio_file.read()
                     buffer.write(content)
 
+                # Debug: Log file details
+                print(f"DEBUG: File size: {len(content)} bytes")
+                print(f"DEBUG: File type: {audio_file.content_type}")
+                print(f"DEBUG: File name: {audio_file.filename}")
+                print(f"DEBUG: First 100 bytes: {content[:100].hex()}")
+
                 # Check if the file is too small (less than 1KB)
                 if len(content) < 1024:
                     return "No speech detected. Please try recording again."

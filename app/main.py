@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import memories, media, transcription
+from app.api import memories, media, transcription, interview
 from app.core.config import settings
 import logging
 
@@ -25,6 +25,7 @@ app.add_middleware(
 app.include_router(memories.router, prefix="/api/memories", tags=["memories"])
 app.include_router(media.router, prefix="/api/media", tags=["media"])
 app.include_router(transcription.router, prefix="/api/transcription", tags=["transcription"])
+app.include_router(interview.router, prefix="/api/interview", tags=["interview"])
 
 @app.get("/")
 async def root():
